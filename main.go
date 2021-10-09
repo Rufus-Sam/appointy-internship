@@ -7,6 +7,7 @@ import (
 	"github.com/joho/godotenv"
     "log"
     "os"
+	"strconv"
 	"net/http"
 	"golang.org/x/crypto/bcrypt"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,13 +17,14 @@ import (
 	"github.com/gorilla/mux"
 )
 var client *mongo.Client
+var pageSize int64 = 2
 
 //User Struct (Model)
 type User struct {
-	Id       primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
-	Name     string `json:"name,omitempty" bson:"name,omitempty"`
-	Email    string `json:"email,omitempty" bson:"email,omitempty"`
-	Password string `json:"password,omitempty" bson:"password,omitempty"`
+	Id       primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"` 
+	Name     string `json:"name,omitempty" bson:"name,omitempty"` 
+	Email    string `json:"email,omitempty" bson:"email,omitempty"` 
+	Password string `json:"password,omitempty" bson:"password,omitempty"` 
 }
 //Post Struct (Model)
 type Post struct {
@@ -49,24 +51,52 @@ func getUsers(res http.ResponseWriter, req *http.Request) {
 	var users []User
 	collection:= client.Database("appointy").Collection("users")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	cursor,err:=collection.Find(ctx,bson.M{})
-	if err!=nil{
-		res.WriteHeader(http.StatusInternalServerError)
-		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
-		return
+	params := mux.Vars(req)
+	if params["page"]!="" {
+		page,_:= strconv.Atoi(params["page"])
+		p:= int64(page)
+		options := options.Find()
+		options.SetLimit(pageSize)
+		options.SetSkip(pageSize * (p - 1))
+		cursor,err:=collection.Find(ctx,bson.M{},options)
+		if err!=nil{
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+			return
+		}
+		defer cursor.Close(ctx)
+		for cursor.Next(ctx){
+			var user User
+			cursor.Decode(&user)
+			users = append(users,user)
+		}
+		if err:= cursor.Err() ; err!=nil{
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+			return
+		}
+		json.NewEncoder(res).Encode(users)
+	}else{
+		cursor,err:=collection.Find(ctx,bson.M{})
+		if err!=nil{
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+			return
+		}
+		defer cursor.Close(ctx)
+		for cursor.Next(ctx){
+			var user User
+			cursor.Decode(&user)
+			users = append(users,user)
+		}
+		if err:= cursor.Err() ; err!=nil{
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+			return
+		}
+		json.NewEncoder(res).Encode(users)
 	}
-	defer cursor.Close(ctx)
-	for cursor.Next(ctx){
-		var user User
-		cursor.Decode(&user)
-		users = append(users,user)
-	}
-	if err:= cursor.Err() ; err!=nil{
-		res.WriteHeader(http.StatusInternalServerError)
-		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
-		return
-	}
-	json.NewEncoder(res).Encode(users)
+	
 }
 
 //POST create new user
@@ -105,24 +135,51 @@ func getPosts(res http.ResponseWriter, req *http.Request) {
 	var posts []Post
 	collection:= client.Database("appointy").Collection("posts")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	cursor,err:=collection.Find(ctx,bson.M{})
-	if err!=nil{
-		res.WriteHeader(http.StatusInternalServerError)
-		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
-		return
+	params := mux.Vars(req)
+	if params["page"]!="" {
+		page,_:= strconv.Atoi(params["page"])
+		p:= int64(page)
+		options := options.Find()
+		options.SetLimit(pageSize)
+		options.SetSkip(pageSize * (p - 1))
+		cursor,err:=collection.Find(ctx,bson.M{},options)
+		if err!=nil{
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+			return
+		}
+		defer cursor.Close(ctx)
+		for cursor.Next(ctx){
+			var post Post
+			cursor.Decode(&post)
+			posts = append(posts,post)
+		}
+		if err:=cursor.Err() ; err!=nil{
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+			return
+		}
+		json.NewEncoder(res).Encode(posts)
+	}else{
+		cursor,err:=collection.Find(ctx,bson.M{})
+		if err!=nil{
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+			return
+		}
+		defer cursor.Close(ctx)
+		for cursor.Next(ctx){
+			var post Post
+			cursor.Decode(&post)
+			posts = append(posts,post)
+		}
+		if err:=cursor.Err() ; err!=nil{
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+			return
+		}
+		json.NewEncoder(res).Encode(posts)
 	}
-	defer cursor.Close(ctx)
-	for cursor.Next(ctx){
-		var post Post
-		cursor.Decode(&post)
-		posts = append(posts,post)
-	}
-	if err:=cursor.Err() ; err!=nil{
-		res.WriteHeader(http.StatusInternalServerError)
-		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
-		return
-	}
-	json.NewEncoder(res).Encode(posts)
 }
 
 //POST create new post
@@ -200,9 +257,11 @@ func main() {
 
 	//route handlers
 	router.HandleFunc("/users", getUsers).Methods("GET")
+	router.HandleFunc("/users/{page}", getUsers).Methods("GET")
 	router.HandleFunc("/users", createUser).Methods("POST")
 	router.HandleFunc("/users/{id}", getUser).Methods("GET")
 	router.HandleFunc("/posts", getPosts).Methods("GET")
+	router.HandleFunc("/posts/{page}", getPosts).Methods("GET")
 	router.HandleFunc("/posts", createPost).Methods("POST")
 	router.HandleFunc("/posts/{id}", getPost).Methods("GET")
 	router.HandleFunc("/posts/users/{id}", getPostsOfUser).Methods("GET")
