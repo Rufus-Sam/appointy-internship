@@ -1,12 +1,17 @@
 package main
 
 import (
+	"time"
+	"context"
 	"encoding/json"
-	"log"
+	"github.com/joho/godotenv"
+    "log"
+    "os"
 	"math/rand"
 	"net/http"
 	"strconv"
-
+	"go.mongodb.org/mongo-driver/mongo"
+    "go.mongodb.org/mongo-driver/mongo/options"
 	"github.com/gorilla/mux"
 )
 
@@ -106,6 +111,18 @@ func getPostsOfUser(res http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
+	//dotenv for mongodb uri
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	//Mongodb connect
+	mongoUri:= os.Getenv("MONGO_URI")
+	ctx,_:= context.WithTimeout(context.Background(), 10*time.Second)
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUri))
+	defer client.Disconnect(ctx)
+
 	// Init router
 	router := mux.NewRouter()
 
