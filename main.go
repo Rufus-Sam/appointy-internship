@@ -8,6 +8,7 @@ import (
     "log"
     "os"
 	"net/http"
+	"golang.org/x/crypto/bcrypt"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,6 +31,16 @@ type Post struct {
 	ImageURL string `json:"image,omitempty" bson:"image,omitempty"`
 	PostedAt primitive.Timestamp `json:"postedAt,omitempty" bson:"postedAt,omitempty"` 
 	User     primitive.ObjectID  `json:"user,omitempty" bson:"user,omitempty"`
+}
+// bcrypt hashing for password
+func HashPassword(password string) (string, error) {
+    bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+    return string(bytes), err
+}
+// function for password checking 
+func CheckPasswordHash(password, hash string) bool {
+    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+    return err == nil
 }
 
 //GET all users
@@ -65,6 +76,7 @@ func createUser(res http.ResponseWriter, req *http.Request) {
 	_ = json.NewDecoder(req.Body).Decode(&user)
 	collection:= client.Database("appointy").Collection("users")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	user.Password, _ = HashPassword(user.Password)
 	result,_:=collection.InsertOne(ctx,user)
 	json.NewEncoder(res).Encode(result)
 
