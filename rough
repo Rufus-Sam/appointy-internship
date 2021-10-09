@@ -4,3 +4,10 @@
 	"math/rand"
 	"strconv"
     "github.com/gorilla/mux"
+
+//Mock data - @todo - implement database
+	posts = append(posts, Post{Id: "1", Caption: "watch", ImageURL: "https://www.youtube.com/watch?v=SonwZ6MF5BE", User: &User{Id: "1", Name: "Rufus", Email: "sam2001rufus@gmail.com", Password: "helloworld"}})
+	users = append(users, User{Id: "1", Name: "Rufus", Email: "sam2001rufus@gmail.com", Password: "helloworld"})
+	posts = append(posts, Post{Id: "2", Caption: "listen", ImageURL: "https://www.youtube.com/watch?v=SonwZ6MF5BE", User: &User{Id: "2", Name: "Sam", Email: "sam2001@gmail.com", Password: "hello"}})
+	posts = append(posts, Post{Id: "3", Caption: "read", ImageURL: "https://www.youtube.com/watch?v=SonwZ6MF5BE", User: &User{Id: "2", Name: "Sam", Email: "sam2001@gmail.com", Password: "hello"}})
+	users = append(users, User{Id: "2", Name: "Sam", Email: "sam2001@gmail.com", Password: "hello"})

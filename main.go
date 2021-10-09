@@ -7,131 +7,182 @@ import (
 	"github.com/joho/godotenv"
     "log"
     "os"
-	"math/rand"
 	"net/http"
-	"strconv"
 	"go.mongodb.org/mongo-driver/mongo"
-    "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"github.com/gorilla/mux"
 )
-
-//Post Struct (Model)
-type Post struct {
-	Id       string `json:"_id"`
-	Caption  string `json:"caption"`
-	ImageURL string `json:"image"`
-	User     *User  `json:"user"`
-}
+var client *mongo.Client
 
 //User Struct (Model)
 type User struct {
-	Id       string `json:"_id"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Id       primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	Name     string `json:"name,omitempty" bson:"name,omitempty"`
+	Email    string `json:"email,omitempty" bson:"email,omitempty"`
+	Password string `json:"password,omitempty" bson:"password,omitempty"`
 }
-
-//init posts as a slice Post struct
-var posts []Post
-var users []User
+//Post Struct (Model)
+type Post struct {
+	Id       primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	Caption  string `json:"caption,omitempty" bson:"caption,omitempty"`
+	ImageURL string `json:"image,omitempty" bson:"image,omitempty"`
+	User     primitive.ObjectID  `json:"user,omitempty" bson:"user,omitempty"`
+}
 
 //GET all users
 func getUsers(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("content-type", "application/json")
+	var users []User
+	collection:= client.Database("appointy").Collection("users")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	cursor,err:=collection.Find(ctx,bson.M{})
+	if err!=nil{
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+		return
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx){
+		var user User
+		cursor.Decode(&user)
+		users = append(users,user)
+	}
+	if err:= cursor.Err() ; err!=nil{
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+		return
+	}
 	json.NewEncoder(res).Encode(users)
 }
 
 //POST create new user
 func createUser(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("content-type", "application/json")
 	var user User
 	_ = json.NewDecoder(req.Body).Decode(&user)
-	user.Id = strconv.Itoa(rand.Intn(10000000)) // Mock Id -not safe
-	users = append(users, user)
-	json.NewEncoder(res).Encode(user)
+	collection:= client.Database("appointy").Collection("users")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	result,_:=collection.InsertOne(ctx,user)
+	json.NewEncoder(res).Encode(result)
 
 }
 
 //GET user by id
 func getUser(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("content-type", "application/json")
 	params := mux.Vars(req) // get the params
-	//loop through posts and find by id
-	for _, item := range users {
-		if item.Id == params["id"] {
-			json.NewEncoder(res).Encode(item)
-			return
-		}
+	id,_ := primitive.ObjectIDFromHex(params["id"]) 
+	var user User
+	collection:= client.Database("appointy").Collection("users")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err:=collection.FindOne(ctx,User{Id:id}).Decode(&user)
+	if err!= nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+		return
 	}
-	json.NewEncoder(res).Encode(&User{})
+	json.NewEncoder(res).Encode(user)
 }
 
 //GET all posts
 func getPosts(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("content-type", "application/json")
+	var posts []Post
+	collection:= client.Database("appointy").Collection("posts")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	cursor,err:=collection.Find(ctx,bson.M{})
+	if err!=nil{
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+		return
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx){
+		var post Post
+		cursor.Decode(&post)
+		posts = append(posts,post)
+	}
+	if err:=cursor.Err() ; err!=nil{
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+		return
+	}
 	json.NewEncoder(res).Encode(posts)
 }
 
 //POST create new post
 func createPost(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("content-type", "application/json")
 	var post Post
 	_ = json.NewDecoder(req.Body).Decode(&post)
-	post.Id = strconv.Itoa(rand.Intn(10000000)) // Mock Id -not safe
-	posts = append(posts, post)
-	json.NewEncoder(res).Encode(post)
+	collection:= client.Database("appointy").Collection("posts")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	result,_:=collection.InsertOne(ctx,post)
+	json.NewEncoder(res).Encode(result)
 }
 
 //GET post by id
 func getPost(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("content-type", "application/json")
 	params := mux.Vars(req) // get the params
-	//loop through posts and find by id
-	for _, item := range posts {
-		if item.Id == params["id"] {
-			json.NewEncoder(res).Encode(item)
-			return
-		}
+	id,_ := primitive.ObjectIDFromHex(params["id"]) 
+	var post Post
+	collection:= client.Database("appointy").Collection("posts")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err:=collection.FindOne(ctx,Post{Id:id}).Decode(&post)
+	if err!= nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+		return
 	}
-	json.NewEncoder(res).Encode(&Post{})
+	json.NewEncoder(res).Encode(post)
 }
 
 //GET all posts of user
 func getPostsOfUser(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("content-type", "application/json")
 	params := mux.Vars(req) // get the params
-	//loop through posts and find by id
-	var postsOfUser []Post
-	for _, item := range posts {
-		if item.User.Id == params["id"] {
-			postsOfUser = append(postsOfUser, item)
-		}
+	id,_ := primitive.ObjectIDFromHex(params["id"]) 
+	var posts []Post
+	collection:= client.Database("appointy").Collection("posts")
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	cursor,err:=collection.Find(ctx,Post{User:id})
+	if err!=nil{
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+		return
 	}
-	json.NewEncoder(res).Encode(postsOfUser)
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx){
+		var post Post
+		cursor.Decode(&post)
+		posts = append(posts,post)
+	}
+	if err:=cursor.Err() ; err!=nil{
+		res.WriteHeader(http.StatusInternalServerError)
+		res.Write([]byte(`{"message" :"`+ err.Error() +`"}`))
+		return
+	}
+	json.NewEncoder(res).Encode(posts)
 }
 
 func main() {
-	//dotenv for mongodb uri
+	//dotenv 
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-
+	
 	//Mongodb connect
 	mongoUri:= os.Getenv("MONGO_URI")
-	ctx,_:= context.WithTimeout(context.Background(), 10*time.Second)
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUri))
-	defer client.Disconnect(ctx)
-
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	clientOptions := options.Client().ApplyURI(mongoUri)
+	client, _ = mongo.Connect(ctx, clientOptions)
+	
 	// Init router
 	router := mux.NewRouter()
-
-	//Mock data - @todo - implement database
-	posts = append(posts, Post{Id: "1", Caption: "watch", ImageURL: "https://www.youtube.com/watch?v=SonwZ6MF5BE", User: &User{Id: "1", Name: "Rufus", Email: "sam2001rufus@gmail.com", Password: "helloworld"}})
-	users = append(users, User{Id: "1", Name: "Rufus", Email: "sam2001rufus@gmail.com", Password: "helloworld"})
-	posts = append(posts, Post{Id: "2", Caption: "listen", ImageURL: "https://www.youtube.com/watch?v=SonwZ6MF5BE", User: &User{Id: "2", Name: "Sam", Email: "sam2001@gmail.com", Password: "hello"}})
-	posts = append(posts, Post{Id: "3", Caption: "read", ImageURL: "https://www.youtube.com/watch?v=SonwZ6MF5BE", User: &User{Id: "2", Name: "Sam", Email: "sam2001@gmail.com", Password: "hello"}})
-	users = append(users, User{Id: "2", Name: "Sam", Email: "sam2001@gmail.com", Password: "hello"})
 
 	//route handlers
 	router.HandleFunc("/users", getUsers).Methods("GET")
