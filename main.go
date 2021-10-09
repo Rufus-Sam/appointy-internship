@@ -28,6 +28,7 @@ type Post struct {
 	Id       primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
 	Caption  string `json:"caption,omitempty" bson:"caption,omitempty"`
 	ImageURL string `json:"image,omitempty" bson:"image,omitempty"`
+	PostedAt primitive.Timestamp `json:"postedAt,omitempty" bson:"postedAt,omitempty"` 
 	User     primitive.ObjectID  `json:"user,omitempty" bson:"user,omitempty"`
 }
 
@@ -119,6 +120,7 @@ func createPost(res http.ResponseWriter, req *http.Request) {
 	_ = json.NewDecoder(req.Body).Decode(&post)
 	collection:= client.Database("appointy").Collection("posts")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	post.PostedAt.T = uint32(time.Now().Unix())
 	result,_:=collection.InsertOne(ctx,post)
 	json.NewEncoder(res).Encode(result)
 }
